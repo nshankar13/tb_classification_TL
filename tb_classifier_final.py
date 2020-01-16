@@ -67,7 +67,7 @@ def create_model(embeddings_index, MAX_SEQUENCE_LENGTH, EMBEDDING_DIM, word_inde
 
     l_dense = Dense(128, activation='relu')(l_flat)
 
-    preds = Dense(6, activation='softmax')(l_dense)
+    """preds = Dense(6, activation='softmax')(l_dense)
 
     model = Model(sequence_input, preds)
     model.compile(loss='categorical_crossentropy',
@@ -78,9 +78,9 @@ def create_model(embeddings_index, MAX_SEQUENCE_LENGTH, EMBEDDING_DIM, word_inde
 
     print("model fitting - more complex convolutional neural network")
 
-    model.summary()
+    model.summary()"""
 
-    return model
+    return l_dense, sequence_input
 
 
 # Complex Model
@@ -88,7 +88,7 @@ def create_model(embeddings_index, MAX_SEQUENCE_LENGTH, EMBEDDING_DIM, word_inde
 def evaluateModel(x_train, y_train, model, x_val, y_val):
     history = model.fit(x_train, y_train, validation_data=(x_val, y_val),
 
-                        nb_epoch=15, batch_size=50)
+                        nb_epoch=1, batch_size=100)
 
     loss, accuracy = model.evaluate(x_val, y_val, verbose=0)
 
@@ -211,7 +211,18 @@ def main():
 
     print('Total %s word vectors in Glove 6B 100d.' % len(embeddings_index))
 
-    old_model = create_model(embeddings_index, MAX_SEQUENCE_LENGTH, EMBEDDING_DIM, word_index)
+    l_dense, sequence_input = create_model(embeddings_index, MAX_SEQUENCE_LENGTH, EMBEDDING_DIM, word_index)
+
+    preds = Dense(6, activation='softmax')(l_dense)
+
+    old_model = Model(sequence_input, preds)
+
+    old_model.compile(loss='categorical_crossentropy',
+
+                  optimizer=Adam(lr=0.0005),
+
+                  metrics=['acc'])
+
 
     acc_old, hist_old = evaluateModel(x_train_main, y_train_main, old_model, x_val, y_val)
 
@@ -221,16 +232,7 @@ def main():
 
     ## Freeze all the layers up to a specific one - conv1d_4
 
-    old_model.trainable = True
 
-    set_trainable = False
-    for layer in old_model.layers:
-        if layer.name == 'conv1d_3':
-            set_trainable = True
-        if set_trainable:
-            layer.trainable = True
-        else:
-            layer.trainable = False
 
     #newsgroups_train_new = fetch_20newsgroups(subset='train', shuffle=True, categories=categoriesNew, )
 
@@ -238,7 +240,30 @@ def main():
     #labels_new = newsgroups_train_new.target
     #texts_new = newsgroups_train_new.data
 
+    preds_new = Dense(3, activation='softmax')(l_dense)
+
+    new_model = Model(sequence_input, preds_new)
+
+    new_model.compile(loss='categorical_crossentropy',
+
+                  optimizer=Adam(lr=0.0005),
+
+                  metrics=['acc'])
+
+    new_model.trainable = True
+
+    set_trainable = False
+    for layer in new_model.layers:
+        if layer.name == 'conv1d_3':
+            set_trainable = True
+        if set_trainable:
+            layer.trainable = True
+        else:
+            layer.trainable = False
+
     data_frame = pd.read_csv('tb_clinic_data.csv')
+    data_frame['labels'] = data_frame['labels'].astype('category')
+    data_frame['labels'] = data_frame['labels'].cat.codes
 
     texts_new = data_frame['notes'].tolist()
     labels_new = data_frame['labels'].tolist()
@@ -299,19 +324,19 @@ def main():
 
     f.close()
 
-    train_subset_x, train_subset_y = random_subset(perc, x_train_main_new, y_train_main_new)
+    #train_subset_x, train_subset_y = x_train_main_new, y_train_main_new
 
-    acc_new, hist_new = evaluateModel(train_subset_x, train_subset_y, old_model, x_val_new, y_val_new)
+    acc_new, hist_new = evaluateModel(x_train_main_new, y_train_main_new, new_model, x_val_new, y_val_new)
 
-    accs.append(acc_new)
+    print("Accuracy: " + str(acc_new))
 
     #acc_new, hist_new = evaluateModel(x_train_main_new, y_train_main_new, old_model, x_val_new, y_val_new)
 
 
     #display_output(hist_new)
 
-    plt.plot(percs, accs)
-    plt.show()
+    #plt.plot(percs, accs)
+    #plt.show()
 
 
 
